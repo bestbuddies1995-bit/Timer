@@ -25,8 +25,10 @@
     /* === Das Panel im Corsair-Glaslook === */
     .panel {
         background: rgba(20, 24, 55, 0.55); /* leicht transparent, violett-blau */
-        padding: 40px 50px;
+        padding: 60px 50px; /* Oben/Unten vergrößert */
         border-radius: 22px;
+        min-width: 480px;
+        min-height: 400px; /* größere Mindesthöhe für mehr Blinkfläche */
 
         /* Glas & Glow */
         border: 1px solid rgba(120, 150, 255, 0.35);
@@ -35,8 +37,13 @@
             0 0 45px rgba(90, 120, 255, 0.12);
         backdrop-filter: blur(12px);
 
+        /* Zentrierung des Inhalts */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+
         text-align: center;
-        min-width: 480px;
     }
 
     h2 {
@@ -106,7 +113,7 @@
 </div>
 
 <script>
-/* === Dein unveränderter Originaltimer === */
+/* === Dein unveränderter Originaltimer, nur Blink geändert === */
 
 const INTERVAL_SITZEN = 45*60;
 const INTERVAL_STEHEN = 30*60;
@@ -137,15 +144,20 @@ function updateDisplay(msg){
   document.getElementById("stehen").innerText = fmtHMS(total_stehen);
 }
 
-let blinkInterval = null;
+let blinking = false;
 
 function triggerBlink() {
     const panel = document.getElementById("panel");
     panel.classList.add("blink-red");
+    blinking = true;
+}
 
-    setTimeout(() => {
+function stopBlink() {
+    if(blinking){
+        const panel = document.getElementById("panel");
         panel.classList.remove("blink-red");
-    }, 20000); // **20 Sekunden**
+        blinking = false;
+    }
 }
 
 function tick(){
@@ -181,8 +193,27 @@ function startWithState(s){
 function start(){startWithState("Stehen");}
 function stop(){running=false; last_ts=null; updateDisplay("Gestoppt.");}
 function pauseResume(){paused=!paused; updateDisplay(paused?`Pausiert (${state})`:`Weiter – jetzt: ${state}`);}
-function sitze(){ if(!running){startWithState("Sitzen"); return;} state="Sitzen"; current_elapsed=0; next_reminder=INTERVAL_SITZEN; last_ts=null; updateDisplay(`Jetzt: ${state}`);}
-function stehe(){ if(!running){startWithState("Stehen"); return;} state="Stehen"; current_elapsed=0; next_reminder=INTERVAL_STEHEN; last_ts=null; updateDisplay(`Jetzt: ${state}`);}
+
+function sitze(){ 
+    if(!running){startWithState("Sitzen"); return;} 
+    stopBlink();
+    state="Sitzen"; 
+    current_elapsed=0; 
+    next_reminder=INTERVAL_SITZEN; 
+    last_ts=null; 
+    updateDisplay(`Jetzt: ${state}`);
+}
+
+function stehe(){ 
+    if(!running){startWithState("Stehen"); return;} 
+    stopBlink();
+    state="Stehen"; 
+    current_elapsed=0; 
+    next_reminder=INTERVAL_STEHEN; 
+    last_ts=null; 
+    updateDisplay(`Jetzt: ${state}`);
+}
+
 function resetTotals(){total_sitzen=0; total_stehen=0; updateDisplay();}
 
 updateDisplay();
