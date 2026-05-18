@@ -12,7 +12,7 @@
         height: 100%;
         width: 100%;
         overflow: hidden;
-        background: #0d0f2a; /* oder ein Bild: url(bg.jpg) */
+        background: #0d0f2a;
         background-size: cover;
         background-repeat: no-repeat;
         background-position: center;
@@ -48,7 +48,7 @@
         max-width: 300px;
     }
 
-    /* === Buttons (30% kleiner als große Version) === */
+    /* === Buttons === */
     button {
         padding: 14px 25px;
         margin: 10px 0;
@@ -67,7 +67,7 @@
         box-shadow: 0 0 20px rgba(130, 150, 255, 0.45);
     }
 
-    /* === ROTER BLINK-EFFEKT direkt auf dem Body === */
+    /* === ROTER BLINK-EFFEKT === */
     .blink-red {
         animation: blinkRed 0.6s infinite alternate;
     }
@@ -97,8 +97,8 @@
     </div>
 
 <script>
-const INTERVAL_SITZEN = 45 * 60; // 45 Minuten
-const INTERVAL_STEHEN = 15 * 60; // 15 Minuten
+const INTERVAL_SITZEN = 30 * 60; // 30 Minuten
+const INTERVAL_STEHEN = 20 * 60; // 20 Minuten
 
 let state = "Stehen";
 let running = false;
