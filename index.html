@@ -27,30 +27,32 @@
     }
 
     h2 {
-        margin-bottom: 8px; /* Für optimale vertikale Kompaktheit */
+        margin-bottom: 8px;
         color: #e0e6ff;
         font-weight: 600;
     }
 
     .timer {
-        margin: 4px 0; /* Minimal kompakter für den Reset-Button */
+        margin: 4px 0;
         font-size: 1.32em;
         color: #cbd3ff;
     }
 
-    /* === Settings-Zeile (kompakt mit Reset-Button) === */
+    /* === Settings-Zeile (flex-wrap verhindert überbreite Zeilen) === */
     .settings-row {
-        margin: 12px 0;
-        font-size: 1.0em; /* Leicht verkleinert, damit alles in eine Zeile passt */
+        margin: 10px 0;
+        font-size: 0.95em; 
         color: #aab4ff;
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: center;
-        gap: 8px;
+        gap: 6px;
+        max-width: 95%;
     }
 
     .small-btn {
-        padding: 3px 8px;
+        padding: 3px 6px;
         margin: 0;
         width: auto;
         background: rgba(70, 80, 130, 0.45);
@@ -66,12 +68,11 @@
         background: rgba(130, 150, 255, 0.25);
     }
 
-    /* Rötlich schimmernder Reset-Button */
+    /* Rötlich schimmernde Reset-Buttons */
     .reset-btn {
         background: rgba(180, 70, 70, 0.4);
         border: 1px solid rgba(255, 120, 120, 0.35);
         color: #ffcccc;
-        margin-left: 4px;
     }
 
     .reset-btn:hover {
@@ -122,7 +123,7 @@
 
 <body id="body">
 
-    <h2 id="status">Gestartet: Stehen</h2>
+    <h2 id="status">Bereit</h2>
 
     <div class="timer">Seit: <span id="seit">00:00</span></div>
     <div class="timer">Erinnerung in: <span id="remind">--:--</span></div>
@@ -130,17 +131,17 @@
     <div class="timer">Gesamt Sitzen: <span id="sitzen">00:00</span></div>
     <div class="timer">Gesamt Stehen: <span id="stehen">00:00</span></div>
 
+    <!-- SETTINGS ZEILE MIT ZWEI RESET-BUTTONS -->
     <div class="settings-row">
-        Ziel: <span id="zielSitzen">25</span>m Sit 
-        <button class="small-btn" onclick="changeSit(5)">+5</button> | 
-        <span id="zielStehen">35</span>m Steh 
-        <button class="small-btn" onclick="changeStand(-5)">-5</button> |
-        <button class="small-btn reset-btn" onclick="resetSettings()">Reset</button>
+        Sit: <span id="zielSitzen">25</span>m <button class="small-btn" onclick="changeSit(5)">+5</button> | 
+        Steh: <span id="zielStehen">35</span>m <button class="small-btn" onclick="changeStand(-5)">-5</button> |
+        <button class="small-btn reset-btn" onclick="resetToday()">Reset Tag</button>
+        <button class="small-btn reset-btn" onclick="resetAll()">Reset All</button>
     </div>
 
     <div class="button-container">
-        <button onclick="start()">Start</button>
-        <button onclick="stop()">Stop</button>
+        <button onclick="start()">Start / Fortsetzen</button>
+        <button onclick="stop()">Stop / Pause</button>
         <button onclick="sitze()">Ich sitze jetzt</button>
         <button onclick="stehe()">Ich stehe jetzt</button>
     </div>
@@ -150,13 +151,14 @@
 const DEFAULT_SITZEN = 25;
 const DEFAULT_STEHEN = 35;
 
-// Werte beim Start aus dem Speicher laden (falls vorhanden), sonst Standard nutzen
+// Einstellungen aus dem Speicher laden
 let interval_sitzen_min = parseInt(localStorage.getItem("sitzen_min")) || DEFAULT_SITZEN;
 let interval_stehen_min = parseInt(localStorage.getItem("stehen_min")) || DEFAULT_STEHEN;
 
 let interval_sitzen_sec = interval_sitzen_min * 60;
 let interval_stehen_sec = interval_stehen_min * 60;
 
+// Variablen für den Laufzeit-Zustand
 let state = "Stehen";
 let running = false;
 let paused = false;
@@ -167,12 +169,52 @@ let total_stehen = 0;
 let next_reminder = interval_stehen_sec;
 let last_ts = null;
 
+// --- SPEICHER-FUNKTION (Speichert ALLES) ---
+function saveState() {
+    localStorage.setItem("sit_stand_data", JSON.stringify({
+        state: state,
+        running: running,
+        current_elapsed: current_elapsed,
+        total_sitzen: total_sitzen,
+        total_stehen: total_stehen,
+        next_reminder: next_reminder,
+        last_saved_ts: Date.now() / 1000
+    }));
+}
+
+// --- LADE-FUNKTION (Lädt Zustand & rechnet Offline-Zeit dazu) ---
+function loadState() {
+    let data = localStorage.getItem("sit_stand_data");
+    if(data) {
+        try {
+            let parsed = JSON.parse(data);
+            state = parsed.state || "Stehen";
+            running = parsed.running || false;
+            current_elapsed = parsed.current_elapsed || 0;
+            total_sitzen = parsed.total_sitzen || 0;
+            total_stehen = parsed.total_stehen || 0;
+            
+            next_reminder = parsed.next_reminder || (state === "Sitzen" ? interval_sitzen_sec : interval_stehen_sec);
+            
+            let saved_ts = parsed.last_saved_ts || (Date.now() / 1000);
+            let diff = (Date.now() / 1000) - saved_ts;
+            
+            if (running && diff > 0) {
+                current_elapsed += diff;
+                if(state === "Sitzen") total_sitzen += diff;
+                else total_stehen += diff;
+            }
+        } catch(e) {
+            console.log("Fehler beim Laden der gespeicherten Daten.");
+        }
+    }
+}
+
 // --- INTERVALL-ÄNDERUNGEN SPEICHERN ---
 function changeSit(m) {
     interval_sitzen_min += m;
     interval_sitzen_sec = interval_sitzen_min * 60;
     
-    // Im lokalen Speicher hinterlegen
     localStorage.setItem("sitzen_min", interval_sitzen_min);
     document.getElementById("zielSitzen").innerText = interval_sitzen_min;
     
@@ -180,6 +222,7 @@ function changeSit(m) {
         next_reminder += (m * 60);
     }
     updateDisplay();
+    saveState();
 }
 
 function changeStand(m) {
@@ -188,7 +231,6 @@ function changeStand(m) {
     interval_stehen_min += m;
     interval_stehen_sec = interval_stehen_min * 60;
     
-    // Im lokalen Speicher hinterlegen
     localStorage.setItem("stehen_min", interval_stehen_min);
     document.getElementById("zielStehen").innerText = interval_stehen_min;
     
@@ -196,34 +238,42 @@ function changeStand(m) {
         next_reminder += (m * 60);
     }
     updateDisplay();
+    saveState();
 }
 
-// --- SYSTEM-RESET (Morgens oder zwischendurch) ---
-function resetSettings() {
-    // 1. Lokalen Speicher leeren
+// --- RESET FÜR DEN NEUEN TAG (Behält Intervalle) ---
+function resetToday() {
+    total_sitzen = 0;
+    total_stehen = 0;
+    current_elapsed = 0;
+    running = false; // Timer wird für den neuen Tag pausiert
+    last_ts = null;
+    next_reminder = state === "Sitzen" ? interval_sitzen_sec : interval_stehen_sec;
+    
+    stopBlink();
+    updateDisplay("Bereit (Tag genullt)");
+    saveState();
+}
+
+// --- RESET ALLES (Setzt Tag UND Intervalle auf Standard zurück) ---
+function resetAll() {
+    // Lokalen Speicher für Intervalle löschen
     localStorage.removeItem("sitzen_min");
     localStorage.removeItem("stehen_min");
 
-    // 2. Intervalle auf Standard zurücksetzen
+    // Variablen auf Standardwerte setzen
     interval_sitzen_min = DEFAULT_SITZEN;
     interval_stehen_min = DEFAULT_STEHEN;
     interval_sitzen_sec = DEFAULT_SITZEN * 60;
     interval_stehen_sec = DEFAULT_STEHEN * 60;
 
-    // 3. Laufende Zeiten und Gesamtzeiten komplett nullen
-    total_sitzen = 0;
-    total_stehen = 0;
-    current_elapsed = 0;
-    next_reminder = state === "Sitzen" ? interval_sitzen_sec : interval_stehen_sec;
-
-    // 4. UI-Elemente live updaten
+    // Anzeige der Intervalle aktualisieren
     document.getElementById("zielSitzen").innerText = interval_sitzen_min;
     document.getElementById("zielStehen").innerText = interval_stehen_min;
     
-    // 5. Blinken aufheben, falls aktiv
-    stopBlink();
-    
-    updateDisplay();
+    // Tag nullen aufrufen
+    resetToday();
+    updateDisplay("Bereit (Alles genullt)");
 }
 // -------------------------------------------------
 
@@ -259,6 +309,8 @@ function stopBlink() {
     }
 }
 
+let tick_count = 0;
+
 function tick(){
   if(!running || paused) return;
   let now = Date.now()/1000;
@@ -271,13 +323,18 @@ function tick(){
 
   let interval = state==="Sitzen"? interval_sitzen_sec : interval_stehen_sec;
 
-  if(current_elapsed>=next_reminder){
+  while(current_elapsed >= next_reminder){
     next_reminder += interval;
     triggerBlink();
     document.getElementById("status").innerText = `⚠️ Erinnerung: ${state}`;
     setTimeout(()=>updateDisplay(),2000);
   }
   updateDisplay();
+  
+  tick_count++;
+  if(tick_count % 5 === 0) {
+      saveState();
+  }
 }
 
 setInterval(tick,200);
@@ -287,10 +344,24 @@ function startWithState(s){
   next_reminder = state==="Sitzen"? interval_sitzen_sec : interval_stehen_sec;
   last_ts = null;
   updateDisplay(`Gestartet: ${state}`);
+  saveState();
 }
 
-function start(){startWithState("Stehen");}
-function stop(){running=false; last_ts=null; updateDisplay("Gestoppt.");}
+function start(){
+    if(running) return; 
+    running=true; 
+    paused=false; 
+    last_ts=null; 
+    updateDisplay(`Gestartet: ${state}`);
+    saveState();
+}
+
+function stop(){
+    running=false; 
+    last_ts=null; 
+    updateDisplay("Gestoppt.");
+    saveState();
+}
 
 function sitze(){ 
     if(!running){startWithState("Sitzen"); return;} 
@@ -300,6 +371,7 @@ function sitze(){
     next_reminder=interval_sitzen_sec;
     last_ts=null; 
     updateDisplay(`Jetzt: ${state}`);
+    saveState();
 }
 
 function stehe(){ 
@@ -310,12 +382,21 @@ function stehe(){
     next_reminder=interval_stehen_sec;
     last_ts=null; 
     updateDisplay(`Jetzt: ${state}`);
+    saveState();
 }
 
 // Initiale Anzeige der geladenen Werte sicherstellen
+loadState();
 document.getElementById("zielSitzen").innerText = interval_sitzen_min;
 document.getElementById("zielStehen").innerText = interval_stehen_min;
-updateDisplay();
+
+if(running) {
+    updateDisplay(`Gestartet: ${state}`);
+} else if (current_elapsed > 0) {
+    updateDisplay(`Gestoppt (Letzter Stand: ${state})`);
+} else {
+    updateDisplay(`Bereit`);
+}
 </script>
 
 </body>
